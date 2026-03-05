@@ -14,6 +14,7 @@ from typing import List
 app = FastAPI(title="PDF and Image OCR API")
 
 def clean_ocr_text(raw_text: str) -> str:
+    # Text cleaning, removing characters and spaces
     text = re.sub(r'\s+', ' ', raw_text) 
     text = re.sub(r'\|', '', text)
     return text.strip()
@@ -36,27 +37,38 @@ async def scan_document(file: UploadFile = File(...)):
             
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
-                # High-res render for OCR
+
+                # Convert page to a high-res image
                 matrix = fitz.Matrix(2.0, 2.0)
                 pix = page.get_pixmap(matrix=matrix)
                 
+                # Convert the pixmap to a format PIL/Tesseract can read
                 img_data = pix.tobytes("png")
                 image = Image.open(io.BytesIO(img_data))
                 
+                # Perform OCR
                 raw_text = pytesseract.image_to_string(image)
+
+                clean_text = clean_ocr_text(raw_text)
+
                 extracted_results.append({
                     "page": page_num + 1,
-                    "text_content": clean_ocr_text(raw_text)
+                    "text_content": clean_text
                 })
             doc.close()
 
         # CASE 2: Image Processing
         elif filename.endswith(image_extensions) or content_type.startswith("image/"):
             image = Image.open(io.BytesIO(file_bytes))
+
+            # Perform OCR directly on the image
             raw_text = pytesseract.image_to_string(image)
+
+            clean_text = clean_ocr_text(raw_text)
+
             extracted_results.append({
                 "page": 1,
-                "text_content": clean_ocr_text(raw_text)
+                "text_content": clean_text
             })
 
         else:
